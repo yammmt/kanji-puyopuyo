@@ -77,7 +77,7 @@ function resetClearEffects(){
 function celebrateClear(matches,chain,points,multiplier){
   resetClearEffects();
   const intensity=Math.min(chain,5),message=$('chain-message');
-  const labels=['えいっ！','ファイヤー！','アイスストーム！','ダイアキュート！','ブレインダムド！','ジュゲム！','ばよえーん！'];
+  const labels=['気合','炎','氷嵐','増幅','呪縛','寿限無','大連鎖'];
   message.dataset.intensity=String(intensity);
   message.innerHTML=`<span class="chain-stamp">${labels[Math.min(chain,labels.length)-1]}</span><span class="chain-count"><b>${chain}</b> 連鎖</span><span class="chain-points">+${points.toLocaleString()}<small>点</small></span><span class="chain-bonus">${matches.length}字消去 · 色ボーナス ×${multiplier}</span>`;
   animateEffect(message,[{opacity:0,transform:'scale(.6) rotate(-10deg)'},{opacity:1,transform:'scale(1.12) rotate(2deg)',offset:.55},{opacity:1,transform:'scale(1) rotate(-3deg)'}],{duration:300,easing:'cubic-bezier(.16,1,.3,1)'});
