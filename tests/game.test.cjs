@@ -60,3 +60,22 @@ test('消去開始時の色で加点し、境界を越えた倍率は次の消�
   assert.equal(scoreForClear(4,1,98),184);
   assert.equal(scoreForClear(4,2,102),400);
 });
+
+const {spawnPiece,overflowsBoard}=require('../game.js');
+test('最上段が埋まっていても待機スペースから出現し、左右へ逃がせる',()=>{
+  const b=board();for(let y=0;y<12;y++)put(b,2,y);
+  const p=spawnPiece(b,pair().tiles);
+  assert.equal(p.y,-1);assert.ok(validPiece(b,p));assert.ok(overflowsBoard(p));
+  const escaped={...p,x:1,y:1};assert.ok(validPiece(b,escaped));assert.equal(overflowsBoard(escaped),false);
+});
+test('最上段だけ空いている場合は片方を盤面上に出す',()=>{
+  const b=board();put(b,2,1);const p=spawnPiece(b,pair().tiles);
+  assert.equal(p.y,0);assert.ok(validPiece(b,p));
+});
+test('待機スペースでも壁・床・固定ブロックを通過しない',()=>{
+  const b=board();assert.equal(validPiece(b,pair(0,2,-2)),false);
+  assert.equal(validPiece(b,pair(0,-1,-1)),false);
+  assert.equal(validPiece(b,pair(0,6,-1)),false);
+  assert.equal(validPiece(b,pair(2,2,11)),false);
+  put(b,1,0);assert.equal(validPiece(b,pair(0,1,0)),false);
+});

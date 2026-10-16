@@ -19,7 +19,7 @@ function findMatches(grid){
 }
 function applyGravity(grid){for(let x=0;x<W;x++){const column=grid.map(row=>row[x]).filter(Boolean);for(let y=H-1;y>=0;y--)grid[y][x]=column.pop()||null;}}
 function positions(piece){const offsets=[[0,-1],[1,0],[0,1],[-1,0]];const [dx,dy]=offsets[piece.rotation];return [[piece.x,piece.y],[piece.x+dx,piece.y+dy]];}
-function validPiece(grid,piece){return positions(piece).every(([x,y])=>x>=0&&x<W&&y>=0&&y<H&&!grid[y][x]);}
+function validPiece(grid,piece){return positions(piece).every(([x,y])=>x>=0&&x<W&&y>=-2&&y<H&&(y<0||!grid[y][x]));}
 function difficultyFor(cleared){
   const level=Math.floor(Math.max(0,cleared)/20);
   return {fallInterval:Math.max(220,850-level*55),colorPercent:Math.max(0,100-Math.floor(Math.max(0,cleared)/10)*10)};
@@ -30,6 +30,15 @@ function scoreMultiplierFor(cleared){
 function scoreForClear(count,chain,cleared){
   return Math.round(count*10*2**(chain-1)*scoreMultiplierFor(cleared));
 }
+const LOCK_DELAY_MS=500;
+function spawnPiece(grid,tiles){
+  for(const y of [1,0,-1]){
+    const piece={x:2,y,rotation:0,tiles};
+    if(validPiece(grid,piece))return piece;
+  }
+  return null;
+}
+function overflowsBoard(piece){return positions(piece).some(([,y])=>y<0);}
 const QUICK_TURN_MS=500;
 function rotatePiece(grid,piece,previousAttempt=null,now=0){
   for(const [dx,dy] of [[0,0],[-1,0],[1,0],[0,-1]]){
@@ -45,10 +54,10 @@ function rotatePiece(grid,piece,previousAttempt=null,now=0){
   }
   return {piece,attempt:null};
 }
-if(typeof module!=='undefined')module.exports={findMatches,applyGravity,GROUPS,positions,validPiece,rotatePiece,QUICK_TURN_MS,difficultyFor,scoreMultiplierFor,scoreForClear};
+if(typeof module!=='undefined')module.exports={findMatches,applyGravity,GROUPS,positions,validPiece,rotatePiece,QUICK_TURN_MS,difficultyFor,scoreMultiplierFor,scoreForClear,LOCK_DELAY_MS,spawnPiece,overflowsBoard};
 if(typeof document!=='undefined'){
 const $=id=>document.getElementById(id);
-let rotationAttempt=null;
+let rotationAttempt=null,groundedElapsed=0;
 let grid,active,next,score=0,cleared=0,maxChain=0,best=0,state='ready',last=0,elapsed=0,run=0;
 try{best=Number(localStorage.getItem('kanji-puyo-best'))||0;}catch{}
 $('best').textContent=best;
@@ -57,9 +66,12 @@ const randomPair=()=>[randomTile(),randomTile()];
 function tileHTML(tile,extra=''){const g=GROUPS[tile.group];return `<div class="tile ${g.id} ${extra}" aria-label="${tile.char}、${g.name}">${tile.char}<small>${g.radical}</small></div>`;}
 $('legend').innerHTML=GROUPS.map(g=>`<div class="legend-row"><div class="tile ${g.id}">${g.radical}</div><span><strong>${g.name}</strong></span></div>`).join('');
 const cells=[];for(let i=0;i<W*H;i++){const cell=document.createElement('div');cell.className='cell';$('board').appendChild(cell);cells.push(cell);}
+const entryCells=[];for(let i=0;i<W*2;i++){const cell=document.createElement('div');cell.className='cell';$('entry-board').appendChild(cell);entryCells.push(cell);}
+function pieceCell(x,y){return y<0?entryCells[(y+2)*W+x]:cells[y*W+x];}
 function valid(piece){return validPiece(grid,piece);}
 function render(){const difficulty=difficultyFor(cleared);document.querySelector('.game-layout').style.setProperty('--color-strength',`${difficulty.colorPercent}%`);$('color-level').textContent=`色のヒント ${difficulty.colorPercent}% · 得点 ×${scoreMultiplierFor(cleared)}`;cells.forEach((c,i)=>{c.innerHTML=grid[Math.floor(i/W)][i%W]?tileHTML(grid[Math.floor(i/W)][i%W]):'';c.classList.remove('clearing');});
-if(active){const ghost={...active};while(valid({...ghost,y:ghost.y+1}))ghost.y++;positions(ghost).forEach(([x,y],i)=>{if(!grid[y][x])cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'ghost');});positions(active).forEach(([x,y],i)=>{cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'active');});}
+entryCells.forEach(cell=>cell.innerHTML='');$('entry-board').hidden=!active||!overflowsBoard(active);
+if(active){const ghost={...active};while(valid({...ghost,y:ghost.y+1}))ghost.y++;positions(ghost).forEach(([x,y],i)=>{if(y>=0&&!grid[y][x])cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'ghost');});positions(active).forEach(([x,y],i)=>{pieceCell(x,y).innerHTML=tileHTML(active.tiles[i],'active');});}
 $('next').innerHTML=next.map(t=>tileHTML(t)).reverse().join('');$('score').textContent=String(score).padStart(5,'0');$('cleared').textContent=cleared;$('max-chain').textContent=maxChain;$('best').textContent=best;
 }
 const effectAnimations=new Set();
@@ -101,22 +113,31 @@ function celebrateClear(matches,chain,points,multiplier){
   animateEffect($('board'),[{transform:'translate(0,0)'},{transform:`translate(${-shake}px,${shake}px)`},{transform:`translate(${shake}px,${-shake}px)`},{transform:'translate(0,0)'}],{duration:180,easing:'ease-out'});
 }
 function showOverlay(kicker,title,description,button){$('overlay').hidden=false;$('overlay').innerHTML=`<span class="overlay-kicker">${kicker}</span><h2>${title}</h2><p>${description}</p><button class="primary" id="overlay-action">${button} →</button>`;$('overlay-action').onclick=state==='paused'?togglePause:start;}
-function spawn(){rotationAttempt=null;active={x:2,y:1,rotation:0,tiles:next};next=randomPair();elapsed=0;if(!valid(active)){active=null;state='over';$('status').textContent='GAME OVER';showOverlay('GOOD PLAY!','また、つなげよう。',`スコア ${score} 点 ・ 最大 ${maxChain} 連鎖<br>もう一度、挑戦してみませんか。`,'もう一度遊ぶ');}render();}
+function gameOver(){active=null;state='over';$('status').textContent='GAME OVER';showOverlay('GOOD PLAY!','また、つなげよう。',`スコア ${score} 点 ・ 最大 ${maxChain} 連鎖<br>もう一度、挑戦してみませんか。`,'もう一度遊ぶ');render();}
+function spawn(){rotationAttempt=null;groundedElapsed=0;active=spawnPiece(grid,next);next=randomPair();elapsed=0;if(!active){gameOver();return;}render();}
 function start(){run++;grid=Array.from({length:H},()=>Array(W).fill(null));next=randomPair();score=0;cleared=0;maxChain=0;active=null;state='playing';$('overlay').hidden=true;resetClearEffects();$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';spawn();}
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function lock(){const token=run;positions(active).forEach(([x,y],i)=>grid[y][x]=active.tiles[i]);active=null;state='resolving';applyGravity(grid);render();let chain=0;
+async function lock(){if(overflowsBoard(active)){gameOver();return;}const token=run;positions(active).forEach(([x,y],i)=>grid[y][x]=active.tiles[i]);active=null;state='resolving';applyGravity(grid);render();let chain=0;
 while(true){const matches=findMatches(grid);if(!matches.length)break;chain++;const points=scoreForClear(matches.length,chain,cleared);celebrateClear(matches,chain,points,scoreMultiplierFor(cleared));matches.forEach(([x,y])=>cells[y*W+x].classList.add('clearing'));await wait(420);if(token!==run)return;matches.forEach(([x,y])=>grid[y][x]=null);score+=points;cleared+=matches.length;maxChain=Math.max(maxChain,chain);if(score>best){best=score;try{localStorage.setItem('kanji-puyo-best',String(best));}catch{}}applyGravity(grid);render();animateEffect($('score'),[{transform:'scale(1)'},{transform:'scale(1.13)',color:'#b66a32'},{transform:'scale(1)'}],{duration:230,easing:'ease-out'});await wait(230);if(token!==run)return;}
 resetClearEffects();state='playing';spawn();}
-function move(dx,dy){if(state!=='playing')return false;const candidate={...active,x:active.x+dx,y:active.y+dy};if(valid(candidate)){if(dx!==0)rotationAttempt=null;active=candidate;render();return true;}if(dy>0)void lock();return false;}
-function rotate(){if(state!=='playing')return;const result=rotatePiece(grid,active,rotationAttempt,performance.now());active=result.piece;rotationAttempt=result.attempt;render();}
+function move(dx,dy){if(state!=='playing')return false;const candidate={...active,x:active.x+dx,y:active.y+dy};if(valid(candidate)){if(dx!==0)rotationAttempt=null;active=candidate;if(valid({...active,y:active.y+1}))groundedElapsed=0;render();return true;}return false;}
+function rotate(){if(state!=='playing')return;const result=rotatePiece(grid,active,rotationAttempt,performance.now());active=result.piece;rotationAttempt=result.attempt;if(valid({...active,y:active.y+1}))groundedElapsed=0;render();}
 function drop(){if(state!=='playing')return;while(valid({...active,y:active.y+1}))active.y++;void lock();}
-function togglePause(){if(state==='playing'){rotationAttempt=null;state='paused';$('status').textContent='PAUSED';$('pause').textContent='▶';showOverlay('TAKE A BREAK','ひとやすみ。','準備ができたら、続きをどうぞ。','ゲームに戻る');}else if(state==='paused'){state='playing';elapsed=0;$('overlay').hidden=true;$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';}}
+function togglePause(){if(state==='playing'){rotationAttempt=null;state='paused';$('status').textContent='PAUSED';$('pause').textContent='▶';showOverlay('TAKE A BREAK','ひとやすみ。','準備ができたら、続きをどうぞ。','ゲームに戻る');}else if(state==='paused'){state='playing';elapsed=0;groundedElapsed=0;$('overlay').hidden=true;$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';}}
 function action(name){if(name==='left')move(-1,0);if(name==='right')move(1,0);if(name==='down')move(0,1);if(name==='rotate')rotate();if(name==='drop')drop();}
 document.addEventListener('keydown',event=>{if($('help').open)return;const actions={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop'};if(actions[event.key]){if(event.target.closest('button')&&event.key===' ')return;event.preventDefault();if(!event.repeat||!['rotate','drop'].includes(actions[event.key]))action(actions[event.key]);}if(event.key.toLowerCase()==='p')togglePause();});
 document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>action(button.dataset.action)));
 $('start').onclick=start;$('restart').onclick=start;$('pause').onclick=togglePause;
 $('help-button').onclick=()=>{if(state==='playing')togglePause();$('help').showModal();};$('close-help').onclick=()=>$('help').close();
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')togglePause();});
-function tick(now){const delta=Math.min(now-last,100);last=now;if(state==='playing'){elapsed+=delta;if(elapsed>=difficultyFor(cleared).fallInterval){elapsed=0;move(0,1);}}requestAnimationFrame(tick);}
+function tick(now){const delta=Math.min(now-last,100);last=now;if(state==='playing'){
+  if(valid({...active,y:active.y+1})){
+    groundedElapsed=0;elapsed+=delta;
+    if(elapsed>=difficultyFor(cleared).fallInterval){elapsed=0;move(0,1);}
+  }else{
+    elapsed=0;groundedElapsed+=delta;
+    if(groundedElapsed>=LOCK_DELAY_MS)void lock();
+  }
+}requestAnimationFrame(tick);}
 grid=Array.from({length:H},()=>Array(W).fill(null));next=randomPair();render();requestAnimationFrame(tick);
 }

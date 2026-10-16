@@ -28,3 +28,7 @@
 .clearing{animation:ink-clear .42s ease-in forwards}
 @keyframes ink-clear{0%{transform:scale(1)}35%{transform:scale(1.14)}65%{opacity:1;transform:scale(.95)}100%{opacity:0;transform:scale(.35) rotate(8deg)}}
 @media(prefers-reduced-motion:reduce){.clearing{animation:none;outline:2px solid #a27935;outline-offset:-2px}.tile{transition:none}#clear-effects{display:none}}
+
+.entry-board{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(2,30px);gap:3px;padding:5px;margin-bottom:5px;border:1px dashed #9aa78f;border-radius:5px;background:#edf0e6}
+.entry-board[hidden]{display:none}
+.entry-board .tile{font-size:21px}
