@@ -20,6 +20,10 @@ function findMatches(grid){
 function applyGravity(grid){for(let x=0;x<W;x++){const column=grid.map(row=>row[x]).filter(Boolean);for(let y=H-1;y>=0;y--)grid[y][x]=column.pop()||null;}}
 function positions(piece){const offsets=[[0,-1],[1,0],[0,1],[-1,0]];const [dx,dy]=offsets[piece.rotation];return [[piece.x,piece.y],[piece.x+dx,piece.y+dy]];}
 function validPiece(grid,piece){return positions(piece).every(([x,y])=>x>=0&&x<W&&y>=0&&y<H&&!grid[y][x]);}
+function difficultyFor(cleared){
+  const level=Math.floor(Math.max(0,cleared)/20);
+  return {fallInterval:Math.max(220,850-level*55),colorPercent:Math.max(0,100-level*10)};
+}
 const QUICK_TURN_MS=500;
 function rotatePiece(grid,piece,previousAttempt=null,now=0){
   for(const [dx,dy] of [[0,0],[-1,0],[1,0],[0,-1]]){
@@ -35,7 +39,7 @@ function rotatePiece(grid,piece,previousAttempt=null,now=0){
   }
   return {piece,attempt:null};
 }
-if(typeof module!=='undefined')module.exports={findMatches,applyGravity,GROUPS,positions,validPiece,rotatePiece,QUICK_TURN_MS};
+if(typeof module!=='undefined')module.exports={findMatches,applyGravity,GROUPS,positions,validPiece,rotatePiece,QUICK_TURN_MS,difficultyFor};
 if(typeof document!=='undefined'){
 const $=id=>document.getElementById(id);
 let rotationAttempt=null;
@@ -48,7 +52,7 @@ function tileHTML(tile,extra=''){const g=GROUPS[tile.group];return `<div class="
 $('legend').innerHTML=GROUPS.map(g=>`<div class="legend-row"><div class="tile ${g.id}">${g.radical}</div><span><strong>${g.name}</strong></span></div>`).join('');
 const cells=[];for(let i=0;i<W*H;i++){const cell=document.createElement('div');cell.className='cell';$('board').appendChild(cell);cells.push(cell);}
 function valid(piece){return validPiece(grid,piece);}
-function render(){cells.forEach((c,i)=>{c.innerHTML=grid[Math.floor(i/W)][i%W]?tileHTML(grid[Math.floor(i/W)][i%W]):'';c.classList.remove('clearing');});
+function render(){const difficulty=difficultyFor(cleared);document.querySelector('.game-layout').style.setProperty('--color-strength',`${difficulty.colorPercent}%`);$('color-level').textContent=`色のヒント ${difficulty.colorPercent}%`;cells.forEach((c,i)=>{c.innerHTML=grid[Math.floor(i/W)][i%W]?tileHTML(grid[Math.floor(i/W)][i%W]):'';c.classList.remove('clearing');});
 if(active){const ghost={...active};while(valid({...ghost,y:ghost.y+1}))ghost.y++;positions(ghost).forEach(([x,y],i)=>{if(!grid[y][x])cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'ghost');});positions(active).forEach(([x,y],i)=>{cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'active');});}
 $('next').innerHTML=next.map(t=>tileHTML(t)).reverse().join('');$('score').textContent=String(score).padStart(5,'0');$('cleared').textContent=cleared;$('max-chain').textContent=maxChain;$('best').textContent=best;
 }
@@ -69,6 +73,6 @@ document.querySelectorAll('[data-action]').forEach(button=>button.addEventListen
 $('start').onclick=start;$('restart').onclick=start;$('pause').onclick=togglePause;
 $('help-button').onclick=()=>{if(state==='playing')togglePause();$('help').showModal();};$('close-help').onclick=()=>$('help').close();
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')togglePause();});
-function tick(now){const delta=Math.min(now-last,100);last=now;if(state==='playing'){elapsed+=delta;if(elapsed>=Math.max(220,850-Math.floor(cleared/20)*55)){elapsed=0;move(0,1);}}requestAnimationFrame(tick);}
+function tick(now){const delta=Math.min(now-last,100);last=now;if(state==='playing'){elapsed+=delta;if(elapsed>=difficultyFor(cleared).fallInterval){elapsed=0;move(0,1);}}requestAnimationFrame(tick);}
 grid=Array.from({length:H},()=>Array(W).fill(null));next=randomPair();render();requestAnimationFrame(tick);
 }

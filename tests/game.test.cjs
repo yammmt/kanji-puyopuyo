@@ -18,3 +18,18 @@ test('入れ替えを繰り返して元に戻せる',()=>{const b=corridor(),p=p
 test('壁際では通常の壁蹴りを優先し、漢字の順序を保つ',()=>{const b=board(),p=pair(2,0);const result=rotatePiece(b,p,100,200);assert.equal(result.piece.rotation,3);assert.equal(result.piece.x,1);assert.equal(result.piece.tiles,p.tiles);assert.equal(result.attempt,null);assert.ok(validPiece(b,result.piece));});
 test('床際でも通常の上方向への補正を保つ',()=>{const b=board(),p=pair(1,2,11);const result=rotatePiece(b,p,null,100);assert.equal(result.piece.rotation,2);assert.equal(result.piece.y,10);assert.ok(validPiece(b,result.piece));});
 test('横向きで回転できないときは入れ替えない',()=>{const b=board(),p=pair(1);for(let x=0;x<6;x++){put(b,x,5);put(b,x,7);}const result=rotatePiece(b,p,100,200);assert.equal(result.piece,p);assert.equal(result.attempt,null);});
+
+const {difficultyFor}=require('../game.js');
+test('20字ごとに速度と色のヒントが段階的に変わる',()=>{
+  assert.deepEqual(difficultyFor(0),{fallInterval:850,colorPercent:100});
+  assert.deepEqual(difficultyFor(19),difficultyFor(0));
+  assert.deepEqual(difficultyFor(20),{fallInterval:795,colorPercent:90});
+  assert.deepEqual(difficultyFor(100),{fallInterval:575,colorPercent:50});
+  assert.deepEqual(difficultyFor(199),{fallInterval:355,colorPercent:10});
+  assert.deepEqual(difficultyFor(200),{fallInterval:300,colorPercent:0});
+});
+test('色は0%で止まり、従来の速度上限と初期状態を維持する',()=>{
+  assert.deepEqual(difficultyFor(240),{fallInterval:220,colorPercent:0});
+  assert.deepEqual(difficultyFor(10000),difficultyFor(240));
+  assert.deepEqual(difficultyFor(0),{fallInterval:850,colorPercent:100});
+});
