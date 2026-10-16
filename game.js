@@ -69,7 +69,7 @@ const cells=[];for(let i=0;i<W*H;i++){const cell=document.createElement('div');c
 const entryCells=[];for(let i=0;i<W*2;i++){const cell=document.createElement('div');cell.className='cell';$('entry-board').appendChild(cell);entryCells.push(cell);}
 function pieceCell(x,y){return y<0?entryCells[(y+2)*W+x]:cells[y*W+x];}
 function valid(piece){return validPiece(grid,piece);}
-function render(){const difficulty=difficultyFor(cleared);document.querySelector('.game-layout').style.setProperty('--color-strength',`${difficulty.colorPercent}%`);$('color-level').textContent=`色のヒント ${difficulty.colorPercent}% · 得点 ×${scoreMultiplierFor(cleared)}`;cells.forEach((c,i)=>{c.innerHTML=grid[Math.floor(i/W)][i%W]?tileHTML(grid[Math.floor(i/W)][i%W]):'';c.classList.remove('clearing');});
+function render(){const difficulty=difficultyFor(cleared);document.querySelector('.game-layout').style.setProperty('--color-strength',`${state==='over'?100:difficulty.colorPercent}%`);$('color-level').textContent=state==='over'?`色を復元 · 最終倍率 ×${scoreMultiplierFor(cleared)}`:`色のヒント ${difficulty.colorPercent}% · 得点 ×${scoreMultiplierFor(cleared)}`;cells.forEach((c,i)=>{c.innerHTML=grid[Math.floor(i/W)][i%W]?tileHTML(grid[Math.floor(i/W)][i%W]):'';c.classList.remove('clearing');});
 entryCells.forEach(cell=>cell.innerHTML='');$('entry-board').hidden=!active||!overflowsBoard(active);
 if(active){const ghost={...active};while(valid({...ghost,y:ghost.y+1}))ghost.y++;positions(ghost).forEach(([x,y],i)=>{if(y>=0&&!grid[y][x])cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'ghost');});positions(active).forEach(([x,y],i)=>{pieceCell(x,y).innerHTML=tileHTML(active.tiles[i],'active');});}
 $('next').innerHTML=next.map(t=>tileHTML(t)).reverse().join('');$('score').textContent=String(score).padStart(5,'0');$('cleared').textContent=cleared;$('max-chain').textContent=maxChain;$('best').textContent=best;
@@ -112,8 +112,8 @@ function celebrateClear(matches,chain,points,multiplier){
   const shake=Math.min(4,intensity);
   animateEffect($('board'),[{transform:'translate(0,0)'},{transform:`translate(${-shake}px,${shake}px)`},{transform:`translate(${shake}px,${-shake}px)`},{transform:'translate(0,0)'}],{duration:180,easing:'ease-out'});
 }
-function showOverlay(kicker,title,description,button){$('overlay').hidden=false;$('overlay').innerHTML=`<span class="overlay-kicker">${kicker}</span><h2>${title}</h2><p>${description}</p><button class="primary" id="overlay-action">${button} →</button>`;$('overlay-action').onclick=state==='paused'?togglePause:start;}
-function gameOver(){active=null;state='over';$('status').textContent='GAME OVER';showOverlay('GOOD PLAY!','また、つなげよう。',`スコア ${score} 点 ・ 最大 ${maxChain} 連鎖<br>もう一度、挑戦してみませんか。`,'もう一度遊ぶ');render();}
+function showOverlay(kicker,title,description,button){$('overlay').dataset.mode=state;$('overlay').hidden=false;$('overlay').innerHTML=`<span class="overlay-kicker">${kicker}</span><h2>${title}</h2><p>${description}</p><button class="primary" id="overlay-action">${button} →</button>`;$('overlay-action').onclick=state==='paused'?togglePause:start;}
+function gameOver(){active=null;state='over';$('status').textContent='GAME OVER';showOverlay('GOOD PLAY!','また、つなげよう。',`スコア ${score} 点 ・ 最大 ${maxChain} 連鎖<br>色を戻しました。盤面を振り返ってみましょう。`,'もう一度遊ぶ');render();}
 function spawn(){touchControls.reset();rotationAttempt=null;groundedElapsed=0;active=spawnPiece(grid,next);next=randomPair();elapsed=0;if(!active){gameOver();return;}render();}
 function start(){run++;grid=Array.from({length:H},()=>Array(W).fill(null));next=randomPair();score=0;cleared=0;maxChain=0;active=null;state='playing';$('overlay').hidden=true;resetClearEffects();$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';spawn();}
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));

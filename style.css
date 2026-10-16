@@ -56,3 +56,9 @@
   footer{margin-top:16px}
 }
 @media(max-width:620px){.board .tile{font-size:clamp(17px,4.7vw,25px)}}
+
+/* Keep the restored board fully visible above the game-over result card. */
+.overlay[data-mode="over"]{position:static;inset:auto;margin-top:10px;padding:18px 12px;background:#f4f6ed;border:1px solid #cdd5c4}
+.overlay[data-mode="over"] h2{margin:10px 0;font-size:21px}
+.overlay[data-mode="over"] p{margin:4px 0}
+.overlay[data-mode="over"] .primary{margin-top:12px}
