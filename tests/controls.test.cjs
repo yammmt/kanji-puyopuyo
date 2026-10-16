@@ -2,6 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
+const {setupTouchControls}=require('../touch-controls.js');
 
 function game(){
   const elements=new Map();let frame,now=0,randomCalls=0;
@@ -13,10 +14,10 @@ function game(){
   math.random=()=>{const call=randomCalls++;return call%2===0?(Math.floor(call/2)%5+.1)/5:0};
   vm.runInNewContext(fs.readFileSync(require.resolve('../game.js'),'utf8'),{
     document:{getElementById:get,createElement:make,querySelector:get,querySelectorAll:()=>buttons,addEventListener(){}},
-    window:{matchMedia:()=>({matches:true})},localStorage:{getItem:()=>null,setItem(){}},
+    setupTouchControls,window:{matchMedia:()=>({matches:true}),addEventListener(){}},localStorage:{getItem:()=>null,setItem(){}},
     performance:{now:()=>now},Math:math,requestAnimationFrame(callback){frame=callback},setTimeout
   });
-  const press=action=>buttons.find(button=>button.dataset.action===action).click();
+  const press=action=>buttons.find(button=>button.dataset.action===action).click({detail:0});
   const advance=ms=>{while(ms>0){const dt=Math.min(100,ms);now+=dt;ms-=dt;frame(now)}};
   get('start').onclick();
   return {get,press,advance};

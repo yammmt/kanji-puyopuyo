@@ -114,7 +114,7 @@ function celebrateClear(matches,chain,points,multiplier){
 }
 function showOverlay(kicker,title,description,button){$('overlay').hidden=false;$('overlay').innerHTML=`<span class="overlay-kicker">${kicker}</span><h2>${title}</h2><p>${description}</p><button class="primary" id="overlay-action">${button} →</button>`;$('overlay-action').onclick=state==='paused'?togglePause:start;}
 function gameOver(){active=null;state='over';$('status').textContent='GAME OVER';showOverlay('GOOD PLAY!','また、つなげよう。',`スコア ${score} 点 ・ 最大 ${maxChain} 連鎖<br>もう一度、挑戦してみませんか。`,'もう一度遊ぶ');render();}
-function spawn(){rotationAttempt=null;groundedElapsed=0;active=spawnPiece(grid,next);next=randomPair();elapsed=0;if(!active){gameOver();return;}render();}
+function spawn(){touchControls.reset();rotationAttempt=null;groundedElapsed=0;active=spawnPiece(grid,next);next=randomPair();elapsed=0;if(!active){gameOver();return;}render();}
 function start(){run++;grid=Array.from({length:H},()=>Array(W).fill(null));next=randomPair();score=0;cleared=0;maxChain=0;active=null;state='playing';$('overlay').hidden=true;resetClearEffects();$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';spawn();}
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function lock(){if(overflowsBoard(active)){gameOver();return;}const token=run;positions(active).forEach(([x,y],i)=>grid[y][x]=active.tiles[i]);active=null;state='resolving';applyGravity(grid);render();let chain=0;
@@ -123,14 +123,14 @@ resetClearEffects();state='playing';spawn();}
 function move(dx,dy){if(state!=='playing')return false;const candidate={...active,x:active.x+dx,y:active.y+dy};if(valid(candidate)){if(dx!==0)rotationAttempt=null;active=candidate;if(valid({...active,y:active.y+1}))groundedElapsed=0;render();return true;}return false;}
 function rotate(){if(state!=='playing')return;const result=rotatePiece(grid,active,rotationAttempt,performance.now());active=result.piece;rotationAttempt=result.attempt;if(valid({...active,y:active.y+1}))groundedElapsed=0;render();}
 function drop(){if(state!=='playing')return;while(valid({...active,y:active.y+1}))active.y++;void lock();}
-function togglePause(){if(state==='playing'){rotationAttempt=null;state='paused';$('status').textContent='PAUSED';$('pause').textContent='▶';showOverlay('TAKE A BREAK','ひとやすみ。','準備ができたら、続きをどうぞ。','ゲームに戻る');}else if(state==='paused'){state='playing';elapsed=0;groundedElapsed=0;$('overlay').hidden=true;$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';}}
+function togglePause(){touchControls.reset();if(state==='playing'){rotationAttempt=null;state='paused';$('status').textContent='PAUSED';$('pause').textContent='▶';showOverlay('TAKE A BREAK','ひとやすみ。','準備ができたら、続きをどうぞ。','ゲームに戻る');}else if(state==='paused'){state='playing';elapsed=0;groundedElapsed=0;$('overlay').hidden=true;$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';}}
 function action(name){if(name==='left')move(-1,0);if(name==='right')move(1,0);if(name==='down')move(0,1);if(name==='rotate')rotate();if(name==='drop')drop();}
 document.addEventListener('keydown',event=>{if($('help').open)return;const actions={ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down',ArrowUp:'rotate',' ':'drop'};if(actions[event.key]){if(event.target.closest('button')&&event.key===' ')return;event.preventDefault();if(!event.repeat||!['rotate','drop'].includes(actions[event.key]))action(actions[event.key]);}if(event.key.toLowerCase()==='p')togglePause();});
-document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>action(button.dataset.action)));
+const touchControls=setupTouchControls({buttons:document.querySelectorAll('[data-action]'),surface:document.querySelector('.board-wrap'),canPlay:()=>state==='playing',action,eventTarget:document,windowTarget:window,now:()=>performance.now()});
 $('start').onclick=start;$('restart').onclick=start;$('pause').onclick=togglePause;
 $('help-button').onclick=()=>{if(state==='playing')togglePause();$('help').showModal();};$('close-help').onclick=()=>$('help').close();
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='playing')togglePause();});
-function tick(now){const delta=Math.min(now-last,100);last=now;if(state==='playing'){
+function tick(now){const delta=Math.min(now-last,100);last=now;touchControls.update(now);if(state==='playing'){
   if(valid({...active,y:active.y+1})){
     groundedElapsed=0;elapsed+=delta;
     if(elapsed>=difficultyFor(cleared).fallInterval){elapsed=0;move(0,1);}
