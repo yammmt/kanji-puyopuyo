@@ -36,3 +36,27 @@ test('色は0%で止まり、従来の速度上限と初期状態を維持する
   assert.deepEqual(difficultyFor(10000),difficultyFor(240));
   assert.deepEqual(difficultyFor(0),{fallInterval:850,colorPercent:100});
 });
+
+const {scoreMultiplierFor,scoreForClear}=require('../game.js');
+test('色のヒントに応じて得点倍率が1倍から5倍に上がる',()=>{
+  assert.equal(scoreMultiplierFor(0),1);
+  assert.equal(scoreMultiplierFor(10),1.4);
+  assert.equal(scoreMultiplierFor(50),3);
+  assert.equal(scoreMultiplierFor(100),5);
+  assert.equal(scoreMultiplierFor(10000),5);
+  assert.equal(scoreForClear(4,1,0),40);
+  assert.equal(scoreForClear(4,1,10),56);
+  assert.equal(scoreForClear(4,1,50),120);
+  assert.equal(scoreForClear(4,1,100),200);
+});
+test('色の倍率を連鎖倍率に掛け、元の連鎖得点も維持する',()=>{
+  assert.equal([1,2,3].reduce((sum,chain)=>sum+scoreForClear(4,chain,0),0),280);
+  assert.equal(scoreForClear(4,2,100),400);
+  assert.equal(scoreForClear(8,3,100),1600);
+});
+test('消去開始時の色で加点し、境界を越えた倍率は次の消去から使う',()=>{
+  assert.equal(scoreForClear(4,1,8),40);
+  assert.equal(scoreForClear(4,2,12),112);
+  assert.equal(scoreForClear(4,1,98),184);
+  assert.equal(scoreForClear(4,2,102),400);
+});

@@ -24,6 +24,12 @@ function difficultyFor(cleared){
   const level=Math.floor(Math.max(0,cleared)/20);
   return {fallInterval:Math.max(220,850-level*55),colorPercent:Math.max(0,100-Math.floor(Math.max(0,cleared)/10)*10)};
 }
+function scoreMultiplierFor(cleared){
+  return (500-4*difficultyFor(cleared).colorPercent)/100;
+}
+function scoreForClear(count,chain,cleared){
+  return Math.round(count*10*2**(chain-1)*scoreMultiplierFor(cleared));
+}
 const QUICK_TURN_MS=500;
 function rotatePiece(grid,piece,previousAttempt=null,now=0){
   for(const [dx,dy] of [[0,0],[-1,0],[1,0],[0,-1]]){
@@ -39,7 +45,7 @@ function rotatePiece(grid,piece,previousAttempt=null,now=0){
   }
   return {piece,attempt:null};
 }
-if(typeof module!=='undefined')module.exports={findMatches,applyGravity,GROUPS,positions,validPiece,rotatePiece,QUICK_TURN_MS,difficultyFor};
+if(typeof module!=='undefined')module.exports={findMatches,applyGravity,GROUPS,positions,validPiece,rotatePiece,QUICK_TURN_MS,difficultyFor,scoreMultiplierFor,scoreForClear};
 if(typeof document!=='undefined'){
 const $=id=>document.getElementById(id);
 let rotationAttempt=null;
@@ -52,7 +58,7 @@ function tileHTML(tile,extra=''){const g=GROUPS[tile.group];return `<div class="
 $('legend').innerHTML=GROUPS.map(g=>`<div class="legend-row"><div class="tile ${g.id}">${g.radical}</div><span><strong>${g.name}</strong></span></div>`).join('');
 const cells=[];for(let i=0;i<W*H;i++){const cell=document.createElement('div');cell.className='cell';$('board').appendChild(cell);cells.push(cell);}
 function valid(piece){return validPiece(grid,piece);}
-function render(){const difficulty=difficultyFor(cleared);document.querySelector('.game-layout').style.setProperty('--color-strength',`${difficulty.colorPercent}%`);$('color-level').textContent=`色のヒント ${difficulty.colorPercent}%`;cells.forEach((c,i)=>{c.innerHTML=grid[Math.floor(i/W)][i%W]?tileHTML(grid[Math.floor(i/W)][i%W]):'';c.classList.remove('clearing');});
+function render(){const difficulty=difficultyFor(cleared);document.querySelector('.game-layout').style.setProperty('--color-strength',`${difficulty.colorPercent}%`);$('color-level').textContent=`色のヒント ${difficulty.colorPercent}% · 得点 ×${scoreMultiplierFor(cleared)}`;cells.forEach((c,i)=>{c.innerHTML=grid[Math.floor(i/W)][i%W]?tileHTML(grid[Math.floor(i/W)][i%W]):'';c.classList.remove('clearing');});
 if(active){const ghost={...active};while(valid({...ghost,y:ghost.y+1}))ghost.y++;positions(ghost).forEach(([x,y],i)=>{if(!grid[y][x])cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'ghost');});positions(active).forEach(([x,y],i)=>{cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'active');});}
 $('next').innerHTML=next.map(t=>tileHTML(t)).reverse().join('');$('score').textContent=String(score).padStart(5,'0');$('cleared').textContent=cleared;$('max-chain').textContent=maxChain;$('best').textContent=best;
 }
@@ -61,7 +67,7 @@ function spawn(){rotationAttempt=null;active={x:2,y:1,rotation:0,tiles:next};nex
 function start(){run++;grid=Array.from({length:H},()=>Array(W).fill(null));next=randomPair();score=0;cleared=0;maxChain=0;active=null;state='playing';$('overlay').hidden=true;$('chain-message').textContent='';$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';spawn();}
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function lock(){const token=run;positions(active).forEach(([x,y],i)=>grid[y][x]=active.tiles[i]);active=null;state='resolving';applyGravity(grid);render();let chain=0;
-while(true){const matches=findMatches(grid);if(!matches.length)break;chain++;$('chain-message').textContent=`${chain} 連鎖！`;matches.forEach(([x,y])=>cells[y*W+x].classList.add('clearing'));await wait(420);if(token!==run)return;matches.forEach(([x,y])=>grid[y][x]=null);score+=matches.length*10*2**(chain-1);cleared+=matches.length;maxChain=Math.max(maxChain,chain);if(score>best){best=score;try{localStorage.setItem('kanji-puyo-best',String(best));}catch{}}applyGravity(grid);render();await wait(230);if(token!==run)return;}
+while(true){const matches=findMatches(grid);if(!matches.length)break;chain++;$('chain-message').textContent=`${chain} 連鎖！`;matches.forEach(([x,y])=>cells[y*W+x].classList.add('clearing'));await wait(420);if(token!==run)return;matches.forEach(([x,y])=>grid[y][x]=null);score+=scoreForClear(matches.length,chain,cleared);cleared+=matches.length;maxChain=Math.max(maxChain,chain);if(score>best){best=score;try{localStorage.setItem('kanji-puyo-best',String(best));}catch{}}applyGravity(grid);render();await wait(230);if(token!==run)return;}
 $('chain-message').textContent='';state='playing';spawn();}
 function move(dx,dy){if(state!=='playing')return false;const candidate={...active,x:active.x+dx,y:active.y+dy};if(valid(candidate)){if(dx!==0)rotationAttempt=null;active=candidate;render();return true;}if(dy>0)void lock();return false;}
 function rotate(){if(state!=='playing')return;const result=rotatePiece(grid,active,rotationAttempt,performance.now());active=result.piece;rotationAttempt=result.attempt;render();}
