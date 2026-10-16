@@ -62,13 +62,51 @@ function render(){const difficulty=difficultyFor(cleared);document.querySelector
 if(active){const ghost={...active};while(valid({...ghost,y:ghost.y+1}))ghost.y++;positions(ghost).forEach(([x,y],i)=>{if(!grid[y][x])cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'ghost');});positions(active).forEach(([x,y],i)=>{cells[y*W+x].innerHTML=tileHTML(active.tiles[i],'active');});}
 $('next').innerHTML=next.map(t=>tileHTML(t)).reverse().join('');$('score').textContent=String(score).padStart(5,'0');$('cleared').textContent=cleared;$('max-chain').textContent=maxChain;$('best').textContent=best;
 }
+const effectAnimations=new Set();
+const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+function animateEffect(element,keyframes,options){
+  if(reducedMotion.matches)return;
+  const animation=element.animate(keyframes,options);effectAnimations.add(animation);
+  const finished=()=>effectAnimations.delete(animation);
+  animation.onfinish=finished;animation.oncancel=finished;
+}
+function resetClearEffects(){
+  for(const animation of effectAnimations)animation.cancel();
+  effectAnimations.clear();$('clear-effects').replaceChildren();$('chain-message').replaceChildren();
+}
+function celebrateClear(matches,chain,points,multiplier){
+  resetClearEffects();
+  const intensity=Math.min(chain,5),message=$('chain-message');
+  const labels=['快！','連！','烈！','轟！','極！'];
+  message.dataset.intensity=String(intensity);
+  message.innerHTML=`<span class="chain-stamp">${labels[intensity-1]}</span><span class="chain-count"><b>${chain}</b> 連鎖</span><span class="chain-points">+${points.toLocaleString()}<small>点</small></span><span class="chain-bonus">${matches.length}字消去 · 色ボーナス ×${multiplier}</span>`;
+  animateEffect(message,[{opacity:0,transform:'scale(.6) rotate(-10deg)'},{opacity:1,transform:'scale(1.12) rotate(2deg)',offset:.55},{opacity:1,transform:'scale(1) rotate(-3deg)'}],{duration:300,easing:'cubic-bezier(.16,1,.3,1)'});
+  if(reducedMotion.matches)return;
+  const layer=$('clear-effects');
+  const origin=layer.getBoundingClientRect();
+  matches.slice(0,24).forEach(([x,y])=>{
+    const rect=cells[y*W+x].getBoundingClientRect();
+    const cx=rect.left-origin.left+rect.width/2,cy=rect.top-origin.top+rect.height/2;
+    const ring=document.createElement('i');ring.className='ink-ring';ring.style.left=`${cx}px`;ring.style.top=`${cy}px`;layer.appendChild(ring);
+    animateEffect(ring,[{opacity:.8,transform:'translate(-50%,-50%) scale(.3)'},{opacity:0,transform:`translate(-50%,-50%) scale(${1.3+intensity*.15})`}],{duration:480,easing:'ease-out',fill:'forwards'});
+    for(let i=0;i<3;i++){
+      const fleck=document.createElement('i');fleck.className='ink-fleck';fleck.style.left=`${cx}px`;fleck.style.top=`${cy}px`;layer.appendChild(fleck);
+      const angle=Math.random()*Math.PI*2,distance=18+Math.random()*(20+intensity*8);
+      const dx=Math.cos(angle)*distance,dy=Math.sin(angle)*distance;
+      animateEffect(fleck,[{opacity:1,transform:'translate(-50%,-50%) scale(1)'},{opacity:0,transform:`translate(${dx}px,${dy}px) rotate(${90+i*100}deg) scale(.2)`}],{duration:500+Math.random()*120,easing:'ease-out',fill:'forwards'});
+    }
+  });
+  // Keep impact inside the board; never shake the page or the controls.
+  const shake=Math.min(4,intensity);
+  animateEffect($('board'),[{transform:'translate(0,0)'},{transform:`translate(${-shake}px,${shake}px)`},{transform:`translate(${shake}px,${-shake}px)`},{transform:'translate(0,0)'}],{duration:180,easing:'ease-out'});
+}
 function showOverlay(kicker,title,description,button){$('overlay').hidden=false;$('overlay').innerHTML=`<span class="overlay-kicker">${kicker}</span><h2>${title}</h2><p>${description}</p><button class="primary" id="overlay-action">${button} →</button>`;$('overlay-action').onclick=state==='paused'?togglePause:start;}
 function spawn(){rotationAttempt=null;active={x:2,y:1,rotation:0,tiles:next};next=randomPair();elapsed=0;if(!valid(active)){active=null;state='over';$('status').textContent='GAME OVER';showOverlay('GOOD PLAY!','また、つなげよう。',`スコア ${score} 点 ・ 最大 ${maxChain} 連鎖<br>もう一度、挑戦してみませんか。`,'もう一度遊ぶ');}render();}
-function start(){run++;grid=Array.from({length:H},()=>Array(W).fill(null));next=randomPair();score=0;cleared=0;maxChain=0;active=null;state='playing';$('overlay').hidden=true;$('chain-message').textContent='';$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';spawn();}
+function start(){run++;grid=Array.from({length:H},()=>Array(W).fill(null));next=randomPair();score=0;cleared=0;maxChain=0;active=null;state='playing';$('overlay').hidden=true;resetClearEffects();$('status').textContent='PLAYING';$('pause').textContent='Ⅱ';spawn();}
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function lock(){const token=run;positions(active).forEach(([x,y],i)=>grid[y][x]=active.tiles[i]);active=null;state='resolving';applyGravity(grid);render();let chain=0;
-while(true){const matches=findMatches(grid);if(!matches.length)break;chain++;$('chain-message').textContent=`${chain} 連鎖！`;matches.forEach(([x,y])=>cells[y*W+x].classList.add('clearing'));await wait(420);if(token!==run)return;matches.forEach(([x,y])=>grid[y][x]=null);score+=scoreForClear(matches.length,chain,cleared);cleared+=matches.length;maxChain=Math.max(maxChain,chain);if(score>best){best=score;try{localStorage.setItem('kanji-puyo-best',String(best));}catch{}}applyGravity(grid);render();await wait(230);if(token!==run)return;}
-$('chain-message').textContent='';state='playing';spawn();}
+while(true){const matches=findMatches(grid);if(!matches.length)break;chain++;const points=scoreForClear(matches.length,chain,cleared);celebrateClear(matches,chain,points,scoreMultiplierFor(cleared));matches.forEach(([x,y])=>cells[y*W+x].classList.add('clearing'));await wait(420);if(token!==run)return;matches.forEach(([x,y])=>grid[y][x]=null);score+=points;cleared+=matches.length;maxChain=Math.max(maxChain,chain);if(score>best){best=score;try{localStorage.setItem('kanji-puyo-best',String(best));}catch{}}applyGravity(grid);render();animateEffect($('score'),[{transform:'scale(1)'},{transform:'scale(1.13)',color:'#b66a32'},{transform:'scale(1)'}],{duration:230,easing:'ease-out'});await wait(230);if(token!==run)return;}
+resetClearEffects();state='playing';spawn();}
 function move(dx,dy){if(state!=='playing')return false;const candidate={...active,x:active.x+dx,y:active.y+dy};if(valid(candidate)){if(dx!==0)rotationAttempt=null;active=candidate;render();return true;}if(dy>0)void lock();return false;}
 function rotate(){if(state!=='playing')return;const result=rotatePiece(grid,active,rotationAttempt,performance.now());active=result.piece;rotationAttempt=result.attempt;render();}
 function drop(){if(state!=='playing')return;while(valid({...active,y:active.y+1}))active.y++;void lock();}
