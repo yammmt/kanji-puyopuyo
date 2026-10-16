@@ -22,7 +22,7 @@ function positions(piece){const offsets=[[0,-1],[1,0],[0,1],[-1,0]];const [dx,dy
 function validPiece(grid,piece){return positions(piece).every(([x,y])=>x>=0&&x<W&&y>=0&&y<H&&!grid[y][x]);}
 function difficultyFor(cleared){
   const level=Math.floor(Math.max(0,cleared)/20);
-  return {fallInterval:Math.max(220,850-level*55),colorPercent:Math.max(0,100-level*10)};
+  return {fallInterval:Math.max(220,850-level*55),colorPercent:Math.max(0,100-Math.floor(Math.max(0,cleared)/10)*10)};
 }
 const QUICK_TURN_MS=500;
 function rotatePiece(grid,piece,previousAttempt=null,now=0){

@@ -20,12 +20,15 @@ test('床際でも通常の上方向への補正を保つ',()=>{const b=board(),
 test('横向きで回転できないときは入れ替えない',()=>{const b=board(),p=pair(1);for(let x=0;x<6;x++){put(b,x,5);put(b,x,7);}const result=rotatePiece(b,p,100,200);assert.equal(result.piece,p);assert.equal(result.attempt,null);});
 
 const {difficultyFor}=require('../game.js');
-test('20字ごとに速度と色のヒントが段階的に変わる',()=>{
+test('速度は20字ごと、色のヒントは10字ごとに変わる',()=>{
   assert.deepEqual(difficultyFor(0),{fallInterval:850,colorPercent:100});
-  assert.deepEqual(difficultyFor(19),difficultyFor(0));
-  assert.deepEqual(difficultyFor(20),{fallInterval:795,colorPercent:90});
-  assert.deepEqual(difficultyFor(100),{fallInterval:575,colorPercent:50});
-  assert.deepEqual(difficultyFor(199),{fallInterval:355,colorPercent:10});
+  assert.deepEqual(difficultyFor(9),difficultyFor(0));
+  assert.deepEqual(difficultyFor(10),{fallInterval:850,colorPercent:90});
+  assert.deepEqual(difficultyFor(19),{fallInterval:850,colorPercent:90});
+  assert.deepEqual(difficultyFor(20),{fallInterval:795,colorPercent:80});
+  assert.deepEqual(difficultyFor(99),{fallInterval:630,colorPercent:10});
+  assert.deepEqual(difficultyFor(100),{fallInterval:575,colorPercent:0});
+  assert.deepEqual(difficultyFor(199),{fallInterval:355,colorPercent:0});
   assert.deepEqual(difficultyFor(200),{fallInterval:300,colorPercent:0});
 });
 test('色は0%で止まり、従来の速度上限と初期状態を維持する',()=>{
